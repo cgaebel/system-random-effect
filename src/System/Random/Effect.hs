@@ -172,11 +172,13 @@ randomBitList k = do
 
 -- | Returns the maximum set bit in an integer.
 maxBit :: Integer -> Int
-maxBit x =
-  let loop y !k
-        | y == 0    = k
-        | otherwise = loop (y `unsafeShiftR` 1) (k+1)
-   in loop x 0
+maxBit x
+  | x == 0    = 0
+  | otherwise =
+    let loop y !k
+          | y == 1    = k
+          | otherwise = loop (y `unsafeShiftR` 1) (k+1)
+     in loop x 0
 
 -- | Repeat a computation until it succeeds a test.
 loopUntil :: Monad m => (a -> Bool) -> m a -> m a
