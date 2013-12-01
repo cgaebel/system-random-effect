@@ -102,7 +102,7 @@ runRandomState :: Random
                -> Eff (State Random :> r) w
                -> Eff r w
 runRandomState seed computation =
-  fmap snd (runState seed computation)
+  snd <$> runState seed computation
 {-# INLINE runRandomState #-}
 
 -- | A generalized form of generating a random number of the correct type
@@ -297,8 +297,6 @@ bernoulliDist k
 --
 --   t must be >= 0
 --   p must be in the range [0, 1].
---
---   Warning: NOT IMPLEMENTED!
 binomialDist :: Member (State Random) r
              => Int  -- ^ t
              -> Rational -- ^ p
@@ -312,9 +310,8 @@ binomialDist t p
     trials <- V.replicateM t randomDouble
 
     let p'           = realToFrac p
-        succeeded    = V.map (<= p') trials
         numSuccesses =
-          V.foldl' (\s b -> if b then s+1 else s) 0 succeeded
+          V.foldl' (\s x -> if x <= p' then s+1 else s) 0 trials
 
     return numSuccesses
 
@@ -486,11 +483,12 @@ newtype DiscreteDistributionHelper =
 
 -- | Performs O(n) work building a table which we can later use
 --   sample with 'discreteDist'.
-buildDDH :: [Integer] -> DiscreteDistributionHelper
+buildDDH :: [Word64] -> DiscreteDistributionHelper
 buildDDH xs =
-  let vs = V.fromList xs
-      s  = V.sum vs
-      ns = V.map (% s) vs -- normalize the list
+  let vs  = V.fromList xs
+      s   = fromIntegral (V.sum vs)
+      vs' = V.map fromIntegral vs
+      ns  = V.map (% s) vs' -- normalize the list
    in DDH (V.postscanl' (+) 0 ns)
 
 -- | Given a pre-build 'DiscreteDistributionHelper' (use 'buildDDH'),
@@ -507,7 +505,7 @@ discreteDist :: Member (State Random) r
 discreteDist (DDH xs) = do
   y <- realToFrac <$> randomDouble
   return $ runST $ do
-    mv <- V.thaw xs
+    mv <- V.unsafeThaw xs
     binarySearch mv y
 
 -- | This function produces random floating-point numbers, which
