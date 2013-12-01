@@ -41,21 +41,32 @@ testDiscreteDistributionInRange xs seed =
   let ddh = buildDDH xs
       minVal = 0
       maxVal = length xs - 1
-   in length xs == 0 || sum xs == 0 ||
+   in sum xs == 0 ||
         ((\x -> x >= minVal && x <= maxVal) . runWithSeed seed $
           discreteDist ddh)
 
 testNoZeroDiscreteDistributionPick :: [Word64] -> Word64 -> Bool
 testNoZeroDiscreteDistributionPick xs seed =
   let ddh = buildDDH xs
-      minVal = 0
-      maxVal = length xs - 1
-   in length xs == 0 || sum xs == 0 ||
+   in sum xs == 0 ||
         ((\x -> (xs !! x) /= 0) . runWithSeed seed $
           discreteDist ddh)
+
+testUnsafeThaw :: [Word64] -> Word64 -> Bool
+testUnsafeThaw xs seed =
+  let ddh = buildDDH xs
+   in sum xs == 0 ||
+        (runWithSeed seed $ do
+          _ <- discreteDist ddh
+          _ <- discreteDist ddh
+          _ <- discreteDist ddh
+          _ <- discreteDist ddh
+          _ <- discreteDist ddh
+          return True)
 
 tests =
   [ testProperty "random range" testUniformRandom
   , testProperty "discrete dist range" testDiscreteDistributionInRange
   , testProperty "no non-zero discrete dist pick" testNoZeroDiscreteDistributionPick
+  , testProperty "unsafeThaw is okay to use" testUnsafeThaw
   ]
