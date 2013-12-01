@@ -205,10 +205,7 @@ bitsToInteger =
 --
 --   Returns a number in the inclusive range [0, range].
 --
---   'hMask' is the mask to get the number of bits per random number
---   we generate.
---
---   'nBits' is the number of bits in 'range'.
+--   'numBits' is the number of bits in 'range'.
 uniformIntDist' :: Member (State Random) r
                 => Integer -- ^ range
                 -> Int     -- ^ numBits
