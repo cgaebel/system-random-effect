@@ -7,6 +7,7 @@ import Control.Eff.State.Strict
 
 import System.Random.Effect
 
+import Control.Applicative
 import Control.Monad (void)
 import Data.Vector ( Vector )
 import qualified Data.Vector as V
@@ -38,33 +39,37 @@ testUniformRandom a b seed =
    in checkRange (low, high) . runWithSeed seed $ do
         uniformIntDist a b
 
-testDiscreteDistributionInRange :: [Word64] -> Word64 -> Bool
-testDiscreteDistributionInRange xs seed =
+newtype DiscreteWeights = DW [Word64]
+  deriving Show
+
+instance Arbitrary DiscreteWeights where
+  arbitrary      = DW <$> suchThat (listOf arbitrary) ((> 0) . sum)
+  shrink (DW xs) = map DW (shrink xs)
+
+testDiscreteDistributionInRange :: DiscreteWeights -> Word64 -> Bool
+testDiscreteDistributionInRange (DW xs) seed =
   let ddh = buildDDH xs
       minVal = 0
       maxVal = length xs - 1
-   in sum xs == 0 ||
-        ((\x -> x >= minVal && x <= maxVal) . runWithSeed seed $
-          discreteDist ddh)
+   in (\x -> x >= minVal && x <= maxVal) . runWithSeed seed $
+          discreteDist ddh
 
-testNoZeroDiscreteDistributionPick :: [Word64] -> Word64 -> Bool
-testNoZeroDiscreteDistributionPick xs seed =
+testNoZeroDiscreteDistributionPick :: DiscreteWeights -> Word64 -> Bool
+testNoZeroDiscreteDistributionPick (DW xs) seed =
   let ddh = buildDDH xs
-   in sum xs == 0 ||
-        ((\x -> (xs !! x) /= 0) . runWithSeed seed $
-          discreteDist ddh)
+   in (\x -> (xs !! x) /= 0) . runWithSeed seed $
+          discreteDist ddh
 
-testUnsafeThaw :: [Word64] -> Word64 -> Bool
-testUnsafeThaw xs seed =
+testUnsafeThaw :: DiscreteWeights -> Word64 -> Bool
+testUnsafeThaw (DW xs) seed =
   let ddh = buildDDH xs
-   in sum xs == 0 ||
-        (runWithSeed seed $ do
+   in runWithSeed seed $ do
           _ <- discreteDist ddh
           _ <- discreteDist ddh
           _ <- discreteDist ddh
           _ <- discreteDist ddh
           _ <- discreteDist ddh
-          return True)
+          return True
 
 testUniformIntegralDist :: Integer -> Integer -> Word64 -> Bool
 testUniformIntegralDist a b seed =
