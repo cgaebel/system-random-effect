@@ -50,10 +50,14 @@ module System.Random.Effect ( Random
                             , randomDouble
                             , randomBits
                             , randomBitList
+                            -- * Shuffling
+                            , knuthShuffle
+                            , knuthShuffleM
                             ) where
 
 import Control.Applicative
 import Control.Monad
+import Control.Monad.Primitive
 import Control.Monad.ST
 import Data.Bits
 import Data.Int
@@ -61,8 +65,10 @@ import Data.List
 import Data.Ratio
 import Data.Typeable
 import Data.Vector.Algorithms.Search
-import Data.Vector ( Vector )
+import Data.Vector ( Vector, (//), (!) )
 import qualified Data.Vector as V
+import Data.Vector.Mutable (MVector)
+import qualified Data.Vector.Mutable as M
 import Data.Word
 import Statistics.Distribution
 
@@ -553,3 +559,34 @@ piecewiseConstantDist intervals weights@(DDH rs)
         (l, r) = (vints V.! idx, vints V.! (idx+1))
 
     uniformRealDist l r
+
+-- | @`randomSwaps` n@ generates a list of swaps to randomize a structure of
+-- size @n@.
+randomSwaps :: Member (State Random) r
+            => Int
+            -> Eff r [(Int, Int)]
+randomSwaps len = zip [0..len - 1]
+              <$> replicateM len (uniformIntegralDist 0 $ len - 1)
+
+-- | Shuffle a mutable vector.
+knuthShuffleM :: ( PrimMonad m
+                 , Applicative m
+                 , Typeable1 m
+                 , Member (State Random) r
+                 , SetMember Lift (Lift m) r
+                 )
+              => MVector (PrimState m) a
+              -> Eff r ()
+knuthShuffleM v = randomSwaps (M.length v) >>= mapM_ swap
+  where
+    swap (i, j) = lift $ do
+        [vi, vj] <- mapM (M.read v) [i, j]
+        mapM_ (uncurry $ M.write v) [(i, vj), (j, vi)]
+
+-- | Shuffle an immutable vector.
+knuthShuffle :: Member (State Random) r
+             => Vector a
+             -> Eff r (Vector a)
+knuthShuffle v0 = foldl' swap v0 <$> randomSwaps (V.length v0)
+  where
+    swap v (i, j) = v // zip [j, i] ((v !) <$> [i, j])
