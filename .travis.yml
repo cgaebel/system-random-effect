@@ -8,6 +8,7 @@ notifications:
 before_install:
     - cabal update
     - cabal install hsc2hs
+    - cabal install --only-dependencies --enable-tests --enable-benchmarks
 
 install:
     - cabal configure --enable-tests --enable-benchmarks -O2
