@@ -64,9 +64,16 @@ testUnsafeThaw xs seed =
           _ <- discreteDist ddh
           return True)
 
+testUniformIntegralDist :: Integer -> Integer -> Word64 -> Bool
+testUniformIntegralDist a b seed =
+  let r1 = runWithSeed seed $ uniformIntDist      a b
+      r2 = runWithSeed seed $ uniformIntegralDist a b
+   in r1 == r2
+
 tests =
   [ testProperty "random range" testUniformRandom
   , testProperty "discrete dist range" testDiscreteDistributionInRange
   , testProperty "no non-zero discrete dist pick" testNoZeroDiscreteDistributionPick
   , testProperty "unsafeThaw is okay to use" testUnsafeThaw
+  , testProperty "testUniformIntegralDist == testUniformIntDist" testUniformIntegralDist
   ]

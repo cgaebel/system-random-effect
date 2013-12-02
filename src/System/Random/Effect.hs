@@ -17,6 +17,7 @@ module System.Random.Effect ( Random
                             , runRandomState
                             -- * Uniform Distributions
                             , uniformIntDist
+                            , uniformIntegralDist
                             , uniformRealDist
                             -- * Bernoulli Distributions
                             , bernoulliDist
@@ -229,6 +230,23 @@ uniformIntDist a' b' =
       maxB  = maxBit range
    in (a+) <$> uniformIntDist' range maxB
 {-# INLINE uniformIntDist #-}
+
+-- | Generates a uniformly distributed random number in
+--   the inclusive range [a, b].
+--
+--   This function is more flexible than 'uniformIntDist'
+--   since it relaxes type constraints, but passing in
+--   constant bounds such as @uniformIntegralDist 0 10@
+--   will warn with -Wall.
+uniformIntegralDist :: (Member (State Random) r
+                     , Integral a)
+                    => a -- ^ a
+                    -> a -- ^ b
+                    -> Eff r a
+uniformIntegralDist a b =
+  fromInteger <$> uniformIntDist (toInteger a)
+                                 (toInteger b)
+{-# INLINE uniformIntegralDist #-}
 
 -- | The part of 'uniformRealDist' that does all the work.
 --   We factor it out so we can inline 'uniformRealDist',
