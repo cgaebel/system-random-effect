@@ -6,10 +6,10 @@ notifications:
   on_failure: always
 
 before_install:
-    - which ghc
     - which hsc2hs
-    - which haddock
     - echo $PATH
+    - export $PATH /usr/local/bin:$PATH
+    - which hsc2hs
     - cabal sandbox init
     - cabal install --only-dependencies --enable-tests --enable-benchmarks
 
