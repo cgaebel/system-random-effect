@@ -30,7 +30,7 @@ test-suite tests
   main-is:             Test.hs
   hs-source-dirs:      test/
 
-  ghc-options:         -rtsopts=all -threaded
+  ghc-options:         -rtsopts=all -threaded -O2
 
   build-depends:       base == 4.6.*
                      , vector == 0.10.*
@@ -49,6 +49,7 @@ benchmark benchmarks
   hs-source-dirs:      bench/
   ghc-options:         -Wall -rtsopts=all -threaded -fno-warn-orphans -O2
   main-is:             Bench.hs
+  x-uses-tf:           true
 
   build-depends:       base == 4.6.*
                      , deepseq == 1.3.*
