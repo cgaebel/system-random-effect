@@ -1,5 +1,5 @@
 name:                  system-random-effect
-version:               0.2.1
+version:               0.3.0
 synopsis:              Random number generation for extensible effects.
 homepage:              https://github.com/wowus/system-random-effect
 license:               BSD3

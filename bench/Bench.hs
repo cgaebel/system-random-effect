@@ -4,7 +4,7 @@
 module Main ( main ) where
 
 import Control.Eff
-import Control.Eff.State
+import Control.Eff.State.Strict
 import Control.Applicative
 import Control.DeepSeq
 import Control.Exception ( evaluate )
