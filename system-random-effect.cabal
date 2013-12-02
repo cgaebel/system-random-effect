@@ -45,7 +45,7 @@ test-suite tests
 benchmark benchmarks
   type:                exitcode-stdio-1.0
   hs-source-dirs:      bench/
-  ghc-options:         -Wall -rtsopts=all -threaded -fno-warn-orphans
+  ghc-options:         -Wall -rtsopts=all -threaded -fno-warn-orphans -O2
   main-is:             Bench.hs
 
   build-depends:       base == 4.6.*

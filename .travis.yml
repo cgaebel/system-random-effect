@@ -4,3 +4,15 @@ notifications:
     - cg.wowus.cg@gmail.com
   on_success: always
   on_failure: always
+
+before_install:
+    - cabal update
+    - cabal install hsc2hs
+
+install:
+    - cabal configure --enable-tests --enable-benchmarks -O2
+    - cabal build
+
+script:
+    - cabal test --show-details=always
+    - cabal bench || true
