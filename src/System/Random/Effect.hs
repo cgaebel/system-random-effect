@@ -60,6 +60,7 @@ import Control.Monad
 import Control.Monad.Primitive
 import Control.Monad.ST
 import Data.Bits
+import Data.Foldable (foldlM)
 import Data.Int
 import Data.List
 import Data.Ratio
@@ -560,14 +561,6 @@ piecewiseConstantDist intervals weights@(DDH rs)
 
     uniformRealDist l r
 
--- | @`randomSwaps` n@ generates a list of swaps to randomize a structure of
--- size @n@.
-randomSwaps :: Member (State Random) r
-            => Int
-            -> Eff r [(Int, Int)]
-randomSwaps len = zip [0..len - 1]
-              <$> replicateM len (uniformIntegralDist 0 $ len - 1)
-
 -- | Shuffle a mutable vector.
 knuthShuffleM :: ( PrimMonad m
                  , Applicative m
@@ -577,9 +570,13 @@ knuthShuffleM :: ( PrimMonad m
                  )
               => MVector (PrimState m) a
               -> Eff r ()
-knuthShuffleM v = randomSwaps (M.length v) >>= mapM_ swap
+knuthShuffleM v = forM_ [0..iLast]
+                $ \i -> uniformIntegralDist 0 iLast
+                    >>= lift . swap i
   where
-    swap (i, j) = lift $ do
+    iLast = M.length v - 1
+
+    swap i j = do
         [vi, vj] <- mapM (M.read v) [i, j]
         mapM_ (uncurry $ M.write v) [(i, vj), (j, vi)]
 
@@ -587,6 +584,10 @@ knuthShuffleM v = randomSwaps (M.length v) >>= mapM_ swap
 knuthShuffle :: Member (State Random) r
              => Vector a
              -> Eff r (Vector a)
-knuthShuffle v0 = foldl' swap v0 <$> randomSwaps (V.length v0)
+knuthShuffle v0 = foldlM swap v0 [0..iLast]
   where
-    swap v (i, j) = v // zip [j, i] ((v !) <$> [i, j])
+    iLast = V.length v0 - 1
+
+    swap v i = do
+        j <- uniformIntegralDist 0 iLast
+        return $ v // zip [j, i] ((v !) <$> [i, j])
