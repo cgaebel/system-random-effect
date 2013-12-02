@@ -82,7 +82,7 @@ import Control.Eff.Lift
 import Control.Eff.State.Strict
 
 -- | A pure mersenne twister pseudo-random number generator.
-data Random = Random {-# UNPACK #-} !SR.PureMT
+newtype Random = Random SR.PureMT
   deriving Typeable
 
 -- | Create a random number generator from a 'Word64' seed.
