@@ -42,6 +42,9 @@ module System.Random.Effect ( Random
                             , buildDDH
                             , discreteDist
                             , piecewiseConstantDist
+                            -- * Shuffling
+                            , knuthShuffle
+                            , knuthShuffleM
                             -- * Raw Generators
                             , randomInt
                             , randomInt64
@@ -50,9 +53,6 @@ module System.Random.Effect ( Random
                             , randomDouble
                             , randomBits
                             , randomBitList
-                            -- * Shuffling
-                            , knuthShuffle
-                            , knuthShuffleM
                             ) where
 
 import Control.Applicative

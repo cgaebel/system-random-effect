@@ -8,6 +8,8 @@ import Control.Eff.State.Strict
 import System.Random.Effect
 
 import Control.Monad (void)
+import Data.Vector ( Vector )
+import qualified Data.Vector as V
 import Data.Word
 import Data.Typeable
 
@@ -70,10 +72,21 @@ testUniformIntegralDist a b seed =
       r2 = runWithSeed seed $ uniformIntegralDist a b
    in r1 == r2
 
+testKnuthShuffle :: [Int] -> Word64 -> Bool
+testKnuthShuffle xs' seed =
+  let xs = V.fromList xs'
+      countIf pred = V.length . V.filter pred
+      shuffled = runWithSeed seed (knuthShuffle xs)
+      sameCount v1 v2 = V.all id
+                      $ V.map (\x -> countIf (== x) v1
+                                  == countIf (== x) v2) v1
+   in sameCount xs shuffled
+
 tests =
   [ testProperty "random range" testUniformRandom
   , testProperty "discrete dist range" testDiscreteDistributionInRange
   , testProperty "no non-zero discrete dist pick" testNoZeroDiscreteDistributionPick
   , testProperty "unsafeThaw is okay to use" testUnsafeThaw
   , testProperty "testUniformIntegralDist == testUniformIntDist" testUniformIntegralDist
+  , testProperty "knuth shuffle" testKnuthShuffle
   ]
