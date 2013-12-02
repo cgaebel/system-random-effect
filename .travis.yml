@@ -6,7 +6,9 @@ notifications:
   on_failure: always
 
 before_install:
+    - cabal sandbox init
     - cabal install hsc2hs
+    - export $PATH .cabal-sandbox/bin:$PATH
     - cabal install --only-dependencies --enable-tests --enable-benchmarks
 
 install:
