@@ -3,6 +3,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 -- | A random number effect, using a pure mersenne twister under
 --   the hood. This should be plug-and-play with any application
 --   making use of extensible effects.
@@ -46,11 +48,7 @@ module System.Random.Effect ( Random
                             , knuthShuffle
                             , knuthShuffleM
                             -- * Raw Generators
-                            , randomInt
-                            , randomInt64
-                            , randomWord
-                            , randomWord64
-                            , randomDouble
+                            , RNG(..)
                             , randomBits
                             , randomBitList
                             ) where
@@ -60,8 +58,6 @@ import Control.Monad
 import Control.Monad.Primitive
 import Control.Monad.ST
 import Data.Bits
-import Data.Foldable (foldlM)
-import Data.Int
 import Data.List
 import Data.Ratio
 import Data.Typeable
@@ -82,90 +78,15 @@ import qualified Statistics.Distribution.Normal        as DN
 --import qualified Statistics.Distribution.Poisson       as DP
 import qualified Statistics.Distribution.StudentT      as DS
 
-import qualified System.Random.Mersenne.Pure64 as SR
-
 import Control.Eff
 import Control.Eff.Lift
-import Control.Eff.State.Strict
 
--- | Complete class for any random number generator.
-class Typeable g => RandomGen g where
-  randomInt    :: Eff g Int
-  randomInt64  :: Eff g Int64
-  randomWord   :: Eff g Word
-  randomWord64 :: Eff g Word64
-  randomDouble :: Eff g Double
-
--- | A pure mersenne twister pseudo-random number generator.
-newtype Random = Random SR.PureMT
-  deriving Typeable
-
-instance Member (State Random) r => RandomGen r where
-  k
-
--- | Create a random number generator from a 'Word64' seed.
-mkRandom :: Word64 -> Random
-mkRandom = Random . SR.pureMT
-{-# INLINE mkRandom #-}
-
--- | Create a new random number generator, using the clocktime as the base for
---   the seed. This must be called from a computation with a lifted base effect
---   of 'IO'.
-mkRandomIO :: SetMember Lift (Lift IO) r
-           => Eff r Random
-mkRandomIO = lift (fmap Random SR.newPureMT)
-{-# INLINE mkRandomIO #-}
-
--- | Runs an effectful random computation, returning the computation's result.
-runRandomState :: Random
-               -> Eff (State Random :> r) w
-               -> Eff r w
-runRandomState seed computation =
-  snd <$> runState seed computation
-{-# INLINE runRandomState #-}
-
--- | A generalized form of generating a random number of the correct type
---   from System.Random.Mersenne.Pure64.
-randomF :: Member (State Random) r
-        => (SR.PureMT -> (a, SR.PureMT))
-        -> Eff r a
-randomF f = do
-  (Random old) <- get
-  let (val, new) = f old
-  put (Random new)
-  return val
-{-# INLINE randomF #-}
-
--- | Yield a new 'Int' value from the generator. The full 64 bits will be used
---   on a 64 bit machine.
-randomInt :: Member (State Random) r => Eff r Int
-randomInt = randomF SR.randomInt
-{-# INLINE randomInt #-}
-
--- | Yield a new 'Word' value from the generator.
-randomWord :: Member (State Random) r => Eff r Word
-randomWord = randomF SR.randomWord
-{-# INLINE randomWord #-}
-
--- | Yield a new 'Int64' value from the generator.
-randomInt64 :: Member (State Random) r => Eff r Int64
-randomInt64 = randomF SR.randomInt64
-{-# INLINE randomInt64 #-}
-
--- | Yield a new 'Word64' value from the generator.
-randomWord64 :: Member (State Random) r => Eff r Word64
-randomWord64 = randomF SR.randomWord64
-{-# INLINE randomWord64 #-}
-
--- | Yield a new 53-bit precise 'Double' value from the generator.
---   The returned number will be in the range [0, 1).
-randomDouble :: Member (State Random) r => Eff r Double
-randomDouble = randomF SR.randomDouble
-{-# INLINE randomDouble #-}
+import System.Random.Effect.MT19937
+import System.Random.Effect.Types
 
 -- | Yields a set of random from the internal generator,
 --   using 'randomWord64' internally.
-randomBits :: (Bits x, Member (State Random) r)
+randomBits :: (Bits x, RNG r)
            => Eff r x
 randomBits = do
   let z     = clearBit (bit 0) 0 -- zero, so we can get the number of bits
@@ -177,7 +98,7 @@ randomBits = do
 {-# INLINE randomBits #-}
 
 -- | Returns a list of bits which have been randomly generated.
-randomBitList :: Member (State Random) r
+randomBitList :: RNG r
               => Int -- ^ The number of bits to generate
               -> Eff r [Bool]
 randomBitList k = do
@@ -225,7 +146,7 @@ bitsToInteger =
 --   Returns a number in the inclusive range [0, range].
 --
 --   'numBits' is the number of bits in 'range'.
-uniformIntDist' :: Member (State Random) r
+uniformIntDist' :: RNG r
                 => Integer -- ^ range
                 -> Int     -- ^ numBits
                 -> Eff r Integer
@@ -237,7 +158,7 @@ uniformIntDist' range nBits
 
 -- | Generates a uniformly distributed random number in
 --   the inclusive range [a, b].
-uniformIntDist :: Member (State Random) r
+uniformIntDist :: RNG r
                => Integer -- ^ a
                -> Integer -- ^ b
                -> Eff r Integer
@@ -256,8 +177,7 @@ uniformIntDist a' b' =
 --   since it relaxes type constraints, but passing in
 --   constant bounds such as @uniformIntegralDist 0 10@
 --   will warn with -Wall.
-uniformIntegralDist :: (Member (State Random) r
-                     , Integral a)
+uniformIntegralDist :: (RNG r, Integral a)
                     => a -- ^ a
                     -> a -- ^ b
                     -> Eff r a
@@ -269,7 +189,7 @@ uniformIntegralDist a b =
 -- | The part of 'uniformRealDist' that does all the work.
 --   We factor it out so we can inline 'uniformRealDist',
 --   and possibly share as much work as possible.
-uniformRealDist' :: Member (State Random) r
+uniformRealDist' :: RNG r
                  => Double -- ^ a
                  -> Double -- ^ range
                  -> Eff r Double
@@ -286,7 +206,7 @@ uniformRealDist' a range = do
 --          these a better way, PLEASE send me a pull request.
 --          I just stole this implementation from the C++11
 --          <random> header.
-uniformRealDist :: Member (State Random) r
+uniformRealDist :: RNG r
                 => Double -- ^ a
                 -> Double -- ^ b
                 -> Eff r Double
@@ -305,8 +225,7 @@ uniformRealDist a' b' =
 --
 --   This is implemented with the inverse transform rule:
 --   <http://en.wikipedia.org/wiki/Inverse_transform_sampling>.
-sampleContDist :: (Member (State Random) r
-                , ContDistr d)
+sampleContDist :: (RNG r, ContDistr d)
                => d -- ^ The distribution to sample.
                -> Eff r Double
 sampleContDist d =
@@ -315,7 +234,7 @@ sampleContDist d =
 -- | Produces random boolean values, according to a discrete probability.
 --
 --   k must be in the range [0, 1].
-bernoulliDist :: Member (State Random) r
+bernoulliDist :: RNG r
               => Rational -- ^ k: The fraction of results which should be true.
               -> Eff r Bool
 bernoulliDist k
@@ -333,7 +252,7 @@ bernoulliDist k
 --
 --   t must be >= 0
 --   p must be in the range [0, 1].
-binomialDist :: Member (State Random) r
+binomialDist :: RNG r
              => Int  -- ^ t
              -> Rational -- ^ p
              -> Eff r Int
@@ -359,7 +278,7 @@ binomialDist t p
 --   k must be >= 0
 --
 --   Warning: NOT IMPLEMENTED!
-negativeBinomialDist :: Member (State Random) r
+negativeBinomialDist :: RNG r
                      => Rational -- ^ p
                      -> Integer  -- ^ k
                      -> Eff r Integer
@@ -379,7 +298,7 @@ negativeBinomialDist p k
 --   p must be in the range (0, 1]
 --
 --   Warning: NOT IMPLEMENTED!
-geometricDist :: Member (State Random) r
+geometricDist :: RNG r
               => Rational -- ^ p
               -> Eff r Integer
 geometricDist p
@@ -395,7 +314,7 @@ geometricDist p
 --   (on the same time/space interval) is μ.
 --
 --   Warning: NOT IMPLEMENTED!
-poissonDist :: Member (State Random) r
+poissonDist :: RNG r
             => Double       -- ^ μ
             -> Eff r Double -- ^ i
 poissonDist =
@@ -408,7 +327,7 @@ poissonDist =
 --   or the distance between point mutations in a DNA strand.
 --
 --   This is the continuous counterpart of 'geometricDist'.
-exponentialDist :: Member (State Random) r
+exponentialDist :: RNG r
                 => Double -- ^ λ. Scale parameter.
                 -> Eff r Double
 exponentialDist lambda =
@@ -417,7 +336,7 @@ exponentialDist lambda =
 -- | For floating-point α, the value obtained is the sum of α
 --   independent exponentially distributed random variables,
 --   each of which has a mean of β.
-gammaDist :: Member (State Random) r
+gammaDist :: RNG r
           => Double -- ^ α. The shape parameter.
           -> Double -- ^ β. The scale parameter.
           -> Eff r Double
@@ -427,7 +346,7 @@ gammaDist alpha beta =
 -- | ???
 --
 -- Warning: NOT IMPLEMENTED!
-weibullDist :: Member (State Random) r
+weibullDist :: RNG r
             => Double -- ^ α. The shape parameter.
             -> Double -- ^ β. The scale parameter.
             -> Eff r Double
@@ -437,7 +356,7 @@ weibullDist =
 -- | ???
 --
 -- Warning: NOT IMPLEMENTED!
-extremeValueDist :: Member (State Random) r
+extremeValueDist :: RNG r
                  => Double -- ^ α. The shape parameter.
                  -> Double -- ^ β. The scale parameter.
                  -> Eff r Double
@@ -446,7 +365,7 @@ extremeValueDist =
 
 -- | Generates random numbers as sampled from the
 --   normal distribution.
-normalDist :: Member (State Random) r
+normalDist :: RNG r
            => Double -- ^ μ. The mean.
            -> Double -- ^ σ. The standard deviation.
            -> Eff r Double
@@ -457,7 +376,7 @@ normalDist mu sigma =
 --   This is based off of sampling the normal distribution,
 --   and then following the instructions at
 --   <http://en.wikipedia.org/wiki/Log-normal_distribution#Generating_log-normally_distributed_random_variates>.
-lognormalDist :: Member (State Random) r
+lognormalDist :: RNG r
               => Double -- ^ μ. The mean.
               -> Double -- ^ σ. The standard deviation.
               -> Eff r Double
@@ -471,7 +390,7 @@ simpleND = DN.normalDistr 0 1
 {-# NOINLINE simpleND #-}
 
 -- | Produces random numbers according to a chi-squared distribution.
-chiSquaredDist :: Member (State Random) r
+chiSquaredDist :: RNG r
                => Int -- ^ n. The number of degrees of freedom.
                -> Eff r Double
 chiSquaredDist n
@@ -481,7 +400,7 @@ chiSquaredDist n
     sampleContDist (DC.chiSquared n)
 
 -- | Produced random numbers according to a Cauchy (or Lorentz) distribution.
-cauchyDist :: Member (State Random) r
+cauchyDist :: RNG r
            => Double -- ^ Central point
            -> Double -- ^ Scale parameter (full width half maximum)
            -> Eff r Double
@@ -491,7 +410,7 @@ cauchyDist a b =
 -- | Produces random numbers according to an F-distribution.
 --
 --   m and n are the degrees of freedom.
-fisherFDist :: Member (State Random) r
+fisherFDist :: RNG r
             => Int -- ^ m
             -> Int -- ^ n
             -> Eff r Double
@@ -504,7 +423,7 @@ fisherFDist m n =
 --   deviation, as in physical measurements. Or, alternatively,
 --   when estimating the unknown mean of a normal distribution
 --   with unknown standard deviation, given n+1 samples. 
-studentTDist :: Member (State Random) r
+studentTDist :: RNG r
              => Double -- ^ The number of degrees of freedom
              -> Eff r Double
 studentTDist d =
@@ -535,7 +454,7 @@ buildDDH xs =
 --
 --   i.e. This function produces an integer with probability equal to
 --   the weight given in its index into the parameter to 'buildDDH'.
-discreteDist :: Member (State Random) r
+discreteDist :: RNG r
              => DiscreteDistributionHelper
              -> Eff r Int
 discreteDist (DDH xs) = do
@@ -554,7 +473,7 @@ discreteDist (DDH xs) = do
 --                             (buildDDH   [ 1, 0,  1 ])`
 --   will produce values between 0 and 1 half the time, and values
 --   between 10 and 15 the other half of the time.
-piecewiseConstantDist :: Member (State Random) r
+piecewiseConstantDist :: RNG r
                       => [Double] -- ^ Intervals
                       -> DiscreteDistributionHelper -- ^ Weights
                       -> Eff r Double
@@ -576,7 +495,7 @@ piecewiseConstantDist intervals weights@(DDH rs)
 knuthShuffleM :: ( PrimMonad m
                  , Applicative m
                  , Typeable1 m
-                 , Member (State Random) r
+                 , RNG r
                  , SetMember Lift (Lift m) r
                  )
               => MVector (PrimState m) a
@@ -592,13 +511,14 @@ knuthShuffleM v = forM_ [0..iLast]
         mapM_ (uncurry $ M.write v) [(i, vj), (j, vi)]
 
 -- | Shuffle an immutable vector.
-knuthShuffle :: Member (State Random) r
+knuthShuffle :: RNG r
              => Vector a
              -> Eff r (Vector a)
-knuthShuffle v0 = foldlM swap v0 [0..iLast]
+knuthShuffle v0 = foldM swap v0 [0..iLast]
   where
     iLast = V.length v0 - 1
 
+    swap :: RNG r => Vector a -> Int -> Eff r (Vector a)
     swap v i = do
         j <- uniformIntegralDist 0 iLast
         return $ v // zip [j, i] ((v !) <$> [i, j])
