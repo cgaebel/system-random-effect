@@ -21,6 +21,8 @@ module System.Random.Effect ( Random
                             , uniformIntDist
                             , uniformIntegralDist
                             , uniformRealDist
+                            -- * Linear Distributions
+                            , linearRealDist
                             -- * Bernoulli Distributions
                             , bernoulliDist
                             , binomialDist
@@ -44,6 +46,7 @@ module System.Random.Effect ( Random
                             , buildDDH
                             , discreteDist
                             , piecewiseConstantDist
+                            , piecewiseLinearDist
                             -- * Shuffling
                             , knuthShuffle
                             , knuthShuffleM
@@ -217,6 +220,18 @@ uniformRealDist a' b' =
 
    in uniformRealDist' a range
 {-# INLINE uniformRealDist #-}
+
+-- | Generates a linearly-distributed random number in the range [a, b).
+-- This code is not guaranteed to be correct.
+linearRealDist :: RNG r
+               => Double
+               -> Double
+               -> Eff r Double
+linearRealDist a' b' = do
+  let (a, b) = (min a' b', max a' b')
+      range = b - a
+  r <- sqrt <$> randomDouble
+  return $ range * r
 
 -- | Samples a continuous distribution.
 --
@@ -463,6 +478,25 @@ discreteDist (DDH xs) = do
     mv <- V.unsafeThaw xs
     binarySearch mv y
 
+piecewiseDist :: RNG r
+              => (Double -> Double -> Eff r Double)
+              -> [Double]
+              -> DiscreteDistributionHelper
+              -> Eff r Double
+piecewiseDist f intervals weights@(DDH rs)
+  | V.length rs + 1 /= length intervals =
+    error $ "system-random-effect: piecewiseConstantDist:"
+      ++ " Incongruent parameter lengths."
+      ++ " intervals=" ++ show intervals
+      ++ " weights="   ++ show rs
+  | otherwise = do
+    idx <- discreteDist weights
+
+    let vints = V.fromList intervals
+        (l, r) = (vints V.! idx, vints V.! (idx+1))
+    f l r
+{-# INLINE piecewiseDist #-}
+
 -- | This function produces random floating-point numbers, which
 --   are uniformly distributed within each of the several subintervals
 --   [b_i, b_(i+1)), each with its own weight w_i. The set of interval
@@ -477,19 +511,23 @@ piecewiseConstantDist :: RNG r
                       => [Double] -- ^ Intervals
                       -> DiscreteDistributionHelper -- ^ Weights
                       -> Eff r Double
-piecewiseConstantDist intervals weights@(DDH rs)
-  | V.length rs + 1 /= length intervals =
-    error $ "system-random-effect: piecewiseConstantDist:"
-      ++ " Incongruent parameter lengths."
-      ++ " intervals=" ++ show intervals
-      ++ " weights="   ++ show rs
-  | otherwise = do
-    idx <- discreteDist weights
+piecewiseConstantDist = piecewiseDist uniformRealDist
 
-    let vints = V.fromList intervals
-        (l, r) = (vints V.! idx, vints V.! (idx+1))
-
-    uniformRealDist l r
+-- | This function produces random floating-point numbers, which
+--   are distributed with linearly-increasing probability within
+--   each of the several subintervals [b_i, b_(i+1)), each with its own
+--   weight w_i. The set of interval boundaries and the set of weights
+--   are the parameters of this distribution.
+--
+--   For example, `piecewiseLinearDist [ 0, 1, 10, 15 ]
+--                             (buildDDH   [ 1, 0,  1 ])`
+--   will produce values between 0 and 1 half the time, and values
+--   between 10 and 15 the other half of the time.
+piecewiseLinearDist :: RNG r
+                    => [Double] -- ^ Intervals
+                    -> DiscreteDistributionHelper -- ^ Weights
+                    -> Eff r Double
+piecewiseLinearDist = piecewiseDist linearRealDist
 
 -- | Shuffle a mutable vector.
 knuthShuffleM :: ( PrimMonad m
