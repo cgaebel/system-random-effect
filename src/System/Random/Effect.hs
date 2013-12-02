@@ -77,8 +77,8 @@ import qualified Statistics.Distribution.StudentT      as DS
 import qualified System.Random.Mersenne.Pure64 as SR
 
 import Control.Eff
-import Control.Eff.State
 import Control.Eff.Lift
+import Control.Eff.State.Strict
 
 -- | A pure mersenne twister pseudo-random number generator.
 data Random = Random {-# UNPACK #-} !SR.PureMT
@@ -92,7 +92,7 @@ mkRandom = Random . SR.pureMT
 -- | Create a new random number generator, using the clocktime as the base for
 --   the seed. This must be called from a computation with a lifted base effect
 --   of 'IO'.
-mkRandomIO :: Member (Lift IO) r
+mkRandomIO :: SetMember Lift (Lift IO) r
            => Eff r Random
 mkRandomIO = lift (fmap Random SR.newPureMT)
 {-# INLINE mkRandomIO #-}
@@ -111,9 +111,9 @@ randomF :: Member (State Random) r
         => (SR.PureMT -> (a, SR.PureMT))
         -> Eff r a
 randomF f = do
-  (Random old) <- getState
+  (Random old) <- get
   let (val, new) = f old
-  putState (Random new)
+  put (Random new)
   return val
 {-# INLINE randomF #-}
 
