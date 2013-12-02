@@ -7,12 +7,12 @@ notifications:
 
 before_install:
     - cabal sandbox init
-    - cabal install -j --only-dependencies --enable-tests --enable-benchmarks --with-hsc2hs=/usr/bin/hsc2hs
+    - cabal install -j --only-dependencies --enable-tests --enable-benchmarks --with-hsc2hs=/usr/bin/with-hsc2hs
 
 install:
     - cabal configure --enable-tests --enable-benchmarks -O2
     - cabal build
 
 script:
-    - cabal test -j --show-details=failures --test-options="-j 16 -a 1000000 --color +RTS -N"
+    - cabal test -j --show-details=failures --test-options="-j 16 -a 100000 --color +RTS -N"
     - cabal bench || true

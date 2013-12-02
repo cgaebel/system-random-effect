@@ -88,9 +88,20 @@ import Control.Eff
 import Control.Eff.Lift
 import Control.Eff.State.Strict
 
+-- | Complete class for any random number generator.
+class Typeable g => RandomGen g where
+  randomInt    :: Eff g Int
+  randomInt64  :: Eff g Int64
+  randomWord   :: Eff g Word
+  randomWord64 :: Eff g Word64
+  randomDouble :: Eff g Double
+
 -- | A pure mersenne twister pseudo-random number generator.
 newtype Random = Random SR.PureMT
   deriving Typeable
+
+instance Member (State Random) r => RandomGen r where
+  k
 
 -- | Create a random number generator from a 'Word64' seed.
 mkRandom :: Word64 -> Random
