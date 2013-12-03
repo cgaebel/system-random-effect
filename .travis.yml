@@ -7,10 +7,11 @@ notifications:
 
 before_install:
     - cabal sandbox init
+    - sudo apt-get install 
     - cabal install -j --only-dependencies --enable-tests --enable-benchmarks --with-hsc2hs=/usr/bin/hsc2hs -O2
 
 install:
-    - cabal configure --enable-tests --enable-benchmarks -O2 --with-haddock=/usr/lib/ghc/bin/haddock-ghc-7.4.1
+    - cabal configure --enable-tests --enable-benchmarks -O2 --with-haddock=/usr/bin/haddock
     - cabal build
 
 script:
