@@ -221,7 +221,8 @@ uniformRealDist a' b' =
    in uniformRealDist' a range
 {-# INLINE uniformRealDist #-}
 
--- | Generates a linearly-distributed random number in the range [a, b).
+-- | Generates a linearly-distributed random number in the range @[a, b)@;
+-- @a@ with a probability of 0.
 -- This code is not guaranteed to be correct.
 linearRealDist :: RNG r
                => Double
@@ -230,8 +231,25 @@ linearRealDist :: RNG r
 linearRealDist a' b' = do
   let (a, b) = (min a' b', max a' b')
       range = b - a
-  r <- sqrt <$> randomDouble
-  return $ range * r
+  -- P(x) =
+  --        { 0        x < a
+  --        { k*(x-a)      a <= x < b
+  --        { 0                     b <= x
+  -- CDF(x) =
+  --        { 0                x < a
+  --        { k*(1/2)*(x-a)^2      a <= x < b
+  --        } 1                             b <= x
+  -- Choose k such that CDF is continuous:
+  --    lim
+  --   x->b-  CDF(x) = k*(1/2)*(b-a)^2 = 1
+  -- k = 2/(b-a)^2 = 2/range^2
+  -- Thus CDF(x, a<=x<b) = ((x-a)/range)^2
+  --      CDF^-1 :: (A, 0<=A<1) -> (x, a<=x<b)
+  --      CDF^1(A) = sqrt(A) * range + a
+  -- Given a uniformly-distributed number in [0, 1),
+  -- we can make it linearly-distributed by applying CDF^-1.
+  r <- randomDouble
+  return $ sqrt(r) * range + a
 
 -- | Samples a continuous distribution.
 --
@@ -287,7 +305,7 @@ binomialDist t p
 
 -- | The value represents the number of failures in a series of
 --   independent yes/no trials (each succeeds with probability p),
---   before exactly k successes occur. 
+--   before exactly k successes occur.
 --
 --   p must be in the range (0, 1]
 --   k must be >= 0
@@ -437,7 +455,7 @@ fisherFDist m n =
 --   measurements, each with additive errors of unknown standard
 --   deviation, as in physical measurements. Or, alternatively,
 --   when estimating the unknown mean of a normal distribution
---   with unknown standard deviation, given n+1 samples. 
+--   with unknown standard deviation, given n+1 samples.
 studentTDist :: RNG r
              => Double -- ^ The number of degrees of freedom
              -> Eff r Double
@@ -478,6 +496,8 @@ discreteDist (DDH xs) = do
     mv <- V.unsafeThaw xs
     binarySearch mv y
 
+-- Select an interval at random from a collection of intervals and
+-- their weights, then run a provided function between its endpoints.
 piecewiseDist :: RNG r
               => (Double -> Double -> Eff r Double)
               -> [Double]
@@ -485,7 +505,7 @@ piecewiseDist :: RNG r
               -> Eff r Double
 piecewiseDist f intervals weights@(DDH rs)
   | V.length rs + 1 /= length intervals =
-    error $ "system-random-effect: piecewiseConstantDist:"
+    error $ "system-random-effect: piecewiseDist:"
       ++ " Incongruent parameter lengths."
       ++ " intervals=" ++ show intervals
       ++ " weights="   ++ show rs
