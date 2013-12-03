@@ -6,12 +6,11 @@ notifications:
   on_failure: always
 
 before_install:
-    - ls -lah /usr/lib/ghc/bin
     - cabal sandbox init
     - cabal install -j --only-dependencies --enable-tests --enable-benchmarks --with-hsc2hs=/usr/bin/hsc2hs
 
 install:
-    - cabal configure --enable-tests --enable-benchmarks -O2 --with-haddock=/usr/lib/ghc/bin/haddock
+    - cabal configure --enable-tests --enable-benchmarks -O2 --with-haddock=/usr/lib/ghc/bin/haddock-ghc-7.4.1
     - cabal build
 
 script:
