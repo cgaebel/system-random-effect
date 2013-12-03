@@ -14,6 +14,6 @@ install:
     - cabal build
 
 script:
-    - cabal test -j --show-details=failures --test-options="-j 16 -a 100000 +RTS -N"
+    - cabal test -j --show-details=always --test-options="-j 16 -a 100000 +RTS -N"
     - cabal bench || true
     - cabal haddock
