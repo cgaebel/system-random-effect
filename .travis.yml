@@ -6,6 +6,7 @@ notifications:
   on_failure: always
 
 before_install:
+    - which haddock
     - cabal sandbox init
     - cabal install -j --only-dependencies --enable-tests --enable-benchmarks --with-hsc2hs=/usr/bin/hsc2hs
 
