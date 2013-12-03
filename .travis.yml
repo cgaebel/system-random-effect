@@ -7,7 +7,7 @@ notifications:
 
 before_install:
     - cabal sandbox init
-    - sudo apt-get install 
+    - sudo apt-get install haddock
     - cabal install -j --only-dependencies --enable-tests --enable-benchmarks --with-hsc2hs=/usr/bin/hsc2hs -O2
 
 install:
