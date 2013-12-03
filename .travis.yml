@@ -7,14 +7,13 @@ notifications:
 
 before_install:
     - cabal sandbox init
-    - sudo apt-get install haddock
     - cabal install -j --only-dependencies --enable-tests --enable-benchmarks --with-hsc2hs=/usr/bin/hsc2hs -O2
 
 install:
-    - cabal configure --enable-tests --enable-benchmarks -O2 --with-haddock=/usr/bin/haddock
+    - cabal configure --enable-tests --enable-benchmarks -O2
     - cabal build
 
 script:
     - cabal test --show-details=always --test-options="-a 10000 +RTS -N"
     - cabal bench || true
-    - cabal haddock
+    - #cabal haddock
