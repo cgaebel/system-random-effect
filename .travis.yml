@@ -10,7 +10,7 @@ before_install:
     - cabal install -j --only-dependencies --enable-tests --enable-benchmarks --with-hsc2hs=/usr/bin/hsc2hs
 
 install:
-    - cabal configure --enable-tests --enable-benchmarks -O2
+    - cabal configure --enable-tests --enable-benchmarks -O2 --with-haddock=/usr/bin/haddock
     - cabal build
 
 script:
