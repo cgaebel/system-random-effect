@@ -118,6 +118,16 @@ testKnuthShuffleEquivalence xs seed = do
 
   return (ks1 == ks2)
 
+testSecureRandom :: Integer -> Integer -> IO Bool
+testSecureRandom a b = do
+  let low  = min a b
+      high = max a b
+
+  runLift $ do
+    rng <- mkSecureRandomIO
+    return $ run $ runRandomState rng $
+      checkRange (low, high) <$> uniformIntDist a b
+
 tests =
   [ testProperty "random range" testUniformRandom
   , testProperty "discrete dist range" testDiscreteDistributionInRange
@@ -127,4 +137,5 @@ tests =
   , testProperty "knuth shuffle" testKnuthShuffle
   , testProperty "knuth shuffle (monadic)" (\xs seed -> morallyDubiousIOProperty $ testKnuthShuffleM xs seed)
   , testProperty "knuth shuffle equivalence" (\xs seed -> morallyDubiousIOProperty $ testKnuthShuffleEquivalence xs seed)
+  , testProperty "secure random" (\a b -> morallyDubiousIOProperty $ testSecureRandom a b)
   ]

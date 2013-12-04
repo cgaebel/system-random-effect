@@ -12,10 +12,9 @@ cabal-version:         >=1.10
 
 library
   hs-source-dirs:      src/
-  ghc-options:         -Wall -fno-warn-orphans
+  ghc-options:         -Wall
   exposed-modules:     System.Random.Effect
-                       System.Random.Effect.MT19937
-  other-modules:       System.Random.Effect.Types
+  other-modules:       System.Random.Effect.Raw
 
   build-depends:       base == 4.6.*
                      , extensible-effects == 1.2.*
@@ -24,6 +23,8 @@ library
                      , vector == 0.10.*
                      , vector-algorithms == 0.5.*
                      , primitive == 0.5.*
+                     , crypto-api == 0.12.*
+                     , bytestring == 0.10.*
 
   default-language:    Haskell2010
 
