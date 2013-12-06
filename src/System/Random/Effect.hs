@@ -17,6 +17,7 @@ module System.Random.Effect ( Random
                             , mkRandomIO
                             , mkSecureRandomIO
                             -- * Running
+                            , forRandEff
                             , runRandomState
                             -- * Uniform Distributions
                             , uniformIntDist
@@ -251,7 +252,7 @@ linearRealDist a' b' = do
   -- CDF(x) =
   --        { 0                x < a
   --        { k*(1/2)*(x-a)^2      a <= x < b
-  --        } 1                             b <= x
+  --        { 1                             b <= x
   -- Choose k such that CDF is continuous:
   --    lim
   --   x->b-  CDF(x) = k*(1/2)*(b-a)^2 = 1
