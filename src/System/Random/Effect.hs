@@ -127,14 +127,10 @@ randomBitList k = do
   return $ take k (concatMap breakBits word64s)
 
 -- | Returns the maximum set bit in an integer.
-maxBit :: Integer -> Int
-maxBit x
-  | x == 0    = 0
-  | otherwise =
-    let loop y !k
-          | y == 1    = k
-          | otherwise = loop (y `unsafeShiftR` 1) (k+1)
-     in loop x 0
+maxBit :: Num a => Integer -> a
+maxBit = let loop !k 0 = k
+             loop !k x = loop (k+1) (x `unsafeShiftR` 1)
+         in loop 0
 
 -- | Repeat a computation until it succeeds a test.
 loopUntil :: Monad m => (a -> Bool) -> m a -> m a
@@ -215,7 +211,7 @@ uniformRealDist' a range = do
   return (d * range + a)
 
 -- | Generates a uniformly distributed random number in
---   the inclusive range [a, b].
+--   the range [a, b).
 --
 --    NOTE: This code might not be correct, in that the
 --          returned value may not be perfectly uniformly
