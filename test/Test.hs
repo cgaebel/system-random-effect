@@ -147,7 +147,7 @@ testUniformIntDist num l range seed = let
                               nums :: Vector Int
                               nums = count randomNums
                               c = satisfyCount (within mean stdev) nums
-                            in fromIntegral c / k >= 0.95
+                            in fromIntegral c / k >= 0.99
   where
     randomNums = let h = l + fromIntegral range - 1
                  in runWithSeed seed
@@ -164,7 +164,7 @@ testUniformIntDist num l range seed = let
 
     change v f i = MV.read v i >>= MV.write v i . f
 
-    within mean stdev v = abs (mean - realToFrac v) <= 3 * stdev + 1
+    within mean stdev v = abs (mean - realToFrac v) <= 4 * stdev + 1
 
 tests =
   [ testProperty "random range" testUniformRandom
