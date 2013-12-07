@@ -17,6 +17,7 @@ module System.Random.Effect.Raw ( Random
                                 , mkRandomIO
                                 , mkSecureRandomIO
                                 -- * Running
+                                , forRandEff
                                 , runRandomState
                                 -- * Raw Generators
                                 , randomInt
@@ -93,6 +94,11 @@ mkSecureRandomIO :: SetMember Lift (Lift IO) r
 mkSecureRandomIO = do
   SecureRandom <$> lift CR.newGenIO
 {-# INLINE mkSecureRandomIO #-}
+
+-- | Use a non-random effect as the Random source for running a random effect.
+forRandEff :: Eff r Random -> Eff (State Random :> r) w -> Eff r w
+forRandEff rndgen e = rndgen >>= (`runRandomState` e)
+{-# INLINE forRandEff #-}
 
 -- | Runs an effectful random computation, returning the computation's result.
 runRandomState :: Random
