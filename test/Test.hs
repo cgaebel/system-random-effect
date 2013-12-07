@@ -1,6 +1,9 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE BangPatterns #-}
 module Main ( main ) where
+
+import Prelude hiding (all)
 
 import Control.Eff
 import Control.Eff.Lift
@@ -9,18 +12,15 @@ import Control.Eff.State.Strict
 import System.Random.Effect
 
 import Control.Applicative
-import Control.Monad (void)
 import Control.Monad.ST
 import Data.Vector ( Vector )
 import qualified Data.Vector as V
+import qualified Data.Vector.Mutable as MV
 import Data.Word
-import Data.Typeable
 
-import Test.Framework (defaultMain, testGroup)
-import Test.Framework.Providers.HUnit
+import Test.Framework ( defaultMain, Test )
 import Test.Framework.Providers.QuickCheck2
 
-import Test.HUnit hiding (State)
 import Test.QuickCheck
 import Test.QuickCheck.Property ( morallyDubiousIOProperty )
 
@@ -86,7 +86,7 @@ testUniformIntegralDist a b seed =
 testKnuthShuffle :: [Int] -> Word64 -> Bool
 testKnuthShuffle xs' seed =
   let xs = V.fromList xs'
-      countIf pred = V.length . V.filter pred
+      countIf f = V.length . V.filter f
       shuffled = runWithSeed seed (knuthShuffle xs)
       sameCount v1 v2 = V.all id
                       $ V.map (\x -> countIf (== x) v1
@@ -96,7 +96,7 @@ testKnuthShuffle xs' seed =
 testKnuthShuffleM :: [Int] -> Word64 -> IO Bool
 testKnuthShuffleM xs' seed = do
   let xs = V.fromList xs'
-      countIf pred = V.length . V.filter pred
+      countIf f = V.length . V.filter f
       shuffled = do
         vs <- V.thaw xs
         runIOWithSeed seed (knuthShuffleM vs)
@@ -128,6 +128,34 @@ testSecureRandom a b = do
     return $ run $ runRandomState rng $
       checkRange (low, high) <$> uniformIntDist a b
 
+(|>) :: b -> (b -> c) -> c
+(|>) = flip ($)
+
+histogram :: Vector Integer -> Vector Int
+histogram v = runST $ do
+  mv <- MV.replicate (fromIntegral (V.maximum v + 1)) 0
+  V.forM_ v $ \i' -> do
+    let i = (fromIntegral i') :: Int
+    !x <- MV.read mv i
+    MV.write mv i (x+1)
+  V.unsafeFreeze mv
+
+-- check if all uniformly distributed numbers are within 10% of the mean.
+-- 10% was a number chosen arbitrarily.
+simpleUniformIntDistTest :: Word64 -> Bool
+simpleUniformIntDistTest seed =
+  let nBuckets = 5 :: Int
+      samplesPerBucket = 4000 :: Int
+      nSamples = nBuckets * samplesPerBucket
+      maxDelta = (fromIntegral samplesPerBucket) `div` 10
+      nums     = uniformIntDist 0 (fromIntegral (nBuckets - 1))
+              |> V.replicateM nSamples
+              |> runWithSeed seed
+      hist     = histogram nums
+   in V.all (\x -> x >= samplesPerBucket - maxDelta
+                && x <= samplesPerBucket + maxDelta) hist
+
+tests :: [Test]
 tests =
   [ testProperty "random range" testUniformRandom
   , testProperty "discrete dist range" testDiscreteDistributionInRange
@@ -138,4 +166,5 @@ tests =
   , testProperty "knuth shuffle (monadic)" (\xs seed -> morallyDubiousIOProperty $ testKnuthShuffleM xs seed)
   , testProperty "knuth shuffle equivalence" (\xs seed -> morallyDubiousIOProperty $ testKnuthShuffleEquivalence xs seed)
   , testProperty "secure random" (\a b -> morallyDubiousIOProperty $ testSecureRandom a b)
+  , testProperty "uniformIntDist is uniform-ish" simpleUniformIntDistTest
   ]
