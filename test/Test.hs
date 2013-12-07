@@ -1,5 +1,6 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE BangPatterns #-}
 module Main ( main ) where
 
 import Prelude hiding (all)
@@ -11,20 +12,15 @@ import Control.Eff.State.Strict
 import System.Random.Effect
 
 import Control.Applicative
-import Control.Monad (void)
 import Control.Monad.ST
-import Data.Foldable (all)
 import Data.Vector ( Vector )
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
 import Data.Word
-import Data.Typeable
 
-import Test.Framework (defaultMain, testGroup)
-import Test.Framework.Providers.HUnit
+import Test.Framework ( defaultMain, Test )
 import Test.Framework.Providers.QuickCheck2
 
-import Test.HUnit hiding (State)
 import Test.QuickCheck
 import Test.QuickCheck.Property ( morallyDubiousIOProperty )
 
@@ -90,7 +86,7 @@ testUniformIntegralDist a b seed =
 testKnuthShuffle :: [Int] -> Word64 -> Bool
 testKnuthShuffle xs' seed =
   let xs = V.fromList xs'
-      countIf pred = V.length . V.filter pred
+      countIf f = V.length . V.filter f
       shuffled = runWithSeed seed (knuthShuffle xs)
       sameCount v1 v2 = V.all id
                       $ V.map (\x -> countIf (== x) v1
@@ -100,7 +96,7 @@ testKnuthShuffle xs' seed =
 testKnuthShuffleM :: [Int] -> Word64 -> IO Bool
 testKnuthShuffleM xs' seed = do
   let xs = V.fromList xs'
-      countIf pred = V.length . V.filter pred
+      countIf f = V.length . V.filter f
       shuffled = do
         vs <- V.thaw xs
         runIOWithSeed seed (knuthShuffleM vs)
@@ -132,40 +128,34 @@ testSecureRandom a b = do
     return $ run $ runRandomState rng $
       checkRange (low, high) <$> uniformIntDist a b
 
--- test std deviation of uniformIntDist.
-testUniformIntDist :: Word16 -> Integer -> Positive Word16 -> Word64 -> Bool
-testUniformIntDist num l range seed = let
-                              k = fromIntegral range
-                              n = fromIntegral num
-                              -- This is a binomial distribution for
-                              -- each number in the range, since the
-                              -- odds of generation are 1 / k, and we
-                              -- generate num independent numbers and
-                              -- sum them.
-                              mean = n / k
-                              stdev = sqrt (n * (k - 1)) / k
-                              nums :: Vector Int
-                              nums = count randomNums
-                              c = satisfyCount (within mean stdev) nums
-                            in fromIntegral c / k >= 0.95
-  where
-    randomNums = let h = l + fromIntegral range - 1
-                 in runWithSeed seed
-                  $ V.replicateM (fromIntegral num)
-                  $ uniformIntDist l h
+(|>) :: b -> (b -> c) -> c
+(|>) = flip ($)
 
-    satisfyCount f = V.foldl' (\i a -> if f a then i + 1 else i) 0
+histogram :: Vector Integer -> Vector Int
+histogram v = runST $ do
+  mv <- MV.replicate (fromIntegral (V.maximum v + 1)) 0
+  V.forM_ v $ \i' -> do
+    let i = (fromIntegral i') :: Int
+    !x <- MV.read mv i
+    MV.write mv i (x+1)
+  V.unsafeFreeze mv
 
-    count :: (Integral a, Num count) => V.Vector a -> V.Vector count
-    count v = runST $ do
-        mv <- MV.replicate (fromIntegral range) 0
-        V.forM_ v $ \a -> change mv (+ 1) (fromIntegral a - fromIntegral l)
-        V.unsafeFreeze mv
+-- check if all uniformly distributed numbers are within 10% of the mean.
+-- 10% was a number chosen arbitrarily.
+simpleUniformIntDistTest :: Word64 -> Bool
+simpleUniformIntDistTest seed =
+  let nBuckets = 5 :: Int
+      samplesPerBucket = 4000 :: Int
+      nSamples = nBuckets * samplesPerBucket
+      maxDelta = (fromIntegral samplesPerBucket) `div` 10
+      nums     = uniformIntDist 0 (fromIntegral (nBuckets - 1))
+              |> V.replicateM nSamples
+              |> runWithSeed seed
+      hist     = histogram nums
+   in V.all (\x -> x >= samplesPerBucket - maxDelta
+                && x <= samplesPerBucket + maxDelta) hist
 
-    change v f i = MV.read v i >>= MV.write v i . f
-
-    within mean stdev v = abs (mean - realToFrac v) <= 3 * stdev + 1
-
+tests :: [Test]
 tests =
   [ testProperty "random range" testUniformRandom
   , testProperty "discrete dist range" testDiscreteDistributionInRange
@@ -176,5 +166,5 @@ tests =
   , testProperty "knuth shuffle (monadic)" (\xs seed -> morallyDubiousIOProperty $ testKnuthShuffleM xs seed)
   , testProperty "knuth shuffle equivalence" (\xs seed -> morallyDubiousIOProperty $ testKnuthShuffleEquivalence xs seed)
   , testProperty "secure random" (\a b -> morallyDubiousIOProperty $ testSecureRandom a b)
-  , testProperty "uniformIntDist stdev" testUniformIntDist
+  , testProperty "uniformIntDist is uniform-ish" simpleUniformIntDistTest
   ]
