@@ -17,4 +17,4 @@ install:
 script:
     - cabal test --show-details=always --test-options="-a 1000 +RTS -N"
     - cabal bench || true
-    - #cabal haddock
+#    - cabal haddock
