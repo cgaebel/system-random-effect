@@ -390,15 +390,16 @@ gammaDist :: Member (State Random) r
 gammaDist alpha beta =
   sampleContDist (DG.gammaDistr alpha beta)
 
--- | ???
---
--- Warning: NOT IMPLEMENTED!
+-- | Generates random numbers as sampled from a Weibull
+--   distribution. It was originally identified to describe
+--   particle size distribution.
 weibullDist :: Member (State Random) r
             => Double -- ^ α. The shape parameter.
             -> Double -- ^ β. The scale parameter.
             -> Eff r Double
-weibullDist =
-  error "system-random-effect: weibullDist: TODO: Patches welcome!"
+weibullDist alpha beta = do -- lambda = beta, k = alpha
+  r <- randomDouble
+  return $ beta * (-log (1-r)) ** (1/alpha)
 
 -- | ???
 --
@@ -409,6 +410,7 @@ extremeValueDist :: Member (State Random) r
                  -> Eff r Double
 extremeValueDist =
   error "system-random-effect: extremeValueDist: TODO: Patches welcome!"
+
 
 -- | Generates random numbers as sampled from the
 --   normal distribution.
