@@ -133,33 +133,38 @@ testSecureRandom a b = do
       checkRange (low, high) <$> uniformIntDist a b
 
 -- test std deviation of uniformIntDist.
-testUniformIntDist :: Word16 -> Integer -> Positive Integer -> IO Bool
-testUniformIntDist num l range = do
-      let
-        k = fromIntegral $ getPositive range
-        n = fromIntegral num
-        -- This is a binomial distribution for each number in the range, since
-        -- the odds of generation are 1 / k, and we generate num
-        -- independent numbers and sum them.
-        mean = n / k
-        stdev = sqrt (n * (k - 1)) / k
-      nums <- randomNums >>= count
-      return $ all (within mean stdev) nums
+testUniformIntDist :: Word16 -> Integer -> Positive Word16 -> Word64 -> Bool
+testUniformIntDist num l range seed = let
+                              k = fromIntegral range
+                              n = fromIntegral num
+                              -- This is a binomial distribution for
+                              -- each number in the range, since the
+                              -- odds of generation are 1 / k, and we
+                              -- generate num independent numbers and
+                              -- sum them.
+                              mean = n / k
+                              stdev = sqrt (n * (k - 1)) / k
+                              nums :: Vector Int
+                              nums = count randomNums
+                              c = satisfyCount (within mean stdev) nums
+                            in fromIntegral c / k >= 0.95
   where
-    randomNums = let h = l + getPositive range - 1
-                 in V.replicateM (fromIntegral num)
-                  $ runLift
-                  $ mkRandomIO `forRandEff` uniformIntDist l h
+    randomNums = let h = l + fromIntegral range - 1
+                 in runWithSeed seed
+                  $ V.replicateM (fromIntegral num)
+                  $ uniformIntDist l h
 
-    count :: (Integral a, Num count) => V.Vector a -> IO (V.Vector count)
-    count v = do
+    satisfyCount f = V.foldl' (\i a -> if f a then i + 1 else i) 0
+
+    count :: (Integral a, Num count) => V.Vector a -> V.Vector count
+    count v = runST $ do
         mv <- MV.replicate (fromIntegral range) 0
         V.forM_ v $ \a -> change mv (+ 1) (fromIntegral a - fromIntegral l)
         V.unsafeFreeze mv
 
     change v f i = MV.read v i >>= MV.write v i . f
 
-    within mean stdev v = abs (mean - realToFrac v) <= 5 * stdev + 1
+    within mean stdev v = abs (mean - realToFrac v) <= 3 * stdev + 1
 
 tests =
   [ testProperty "random range" testUniformRandom
@@ -171,5 +176,5 @@ tests =
   , testProperty "knuth shuffle (monadic)" (\xs seed -> morallyDubiousIOProperty $ testKnuthShuffleM xs seed)
   , testProperty "knuth shuffle equivalence" (\xs seed -> morallyDubiousIOProperty $ testKnuthShuffleEquivalence xs seed)
   , testProperty "secure random" (\a b -> morallyDubiousIOProperty $ testSecureRandom a b)
-  , testProperty "uniformIntDist stdev" $ \n l h -> morallyDubiousIOProperty $ testUniformIntDist n l h
+  , testProperty "uniformIntDist stdev" testUniformIntDist
   ]
