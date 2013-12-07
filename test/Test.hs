@@ -133,7 +133,7 @@ testSecureRandom a b = do
       checkRange (low, high) <$> uniformIntDist a b
 
 -- test std deviation of uniformIntDist.
-testUniformIntDist :: Word16 -> Integer -> Positive Word16 -> Word64 -> Bool
+testUniformIntDist :: Word8 -> Integer -> Positive Word16 -> Word64 -> Bool
 testUniformIntDist num l range seed = let
                               k = fromIntegral range
                               n = fromIntegral num
