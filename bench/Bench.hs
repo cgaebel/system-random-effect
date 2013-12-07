@@ -1,8 +1,11 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverlappingInstances #-}
 module Main ( main ) where
 
+import Data.Bits
+import Data.List
 import Data.Word
 
 import Control.Eff
@@ -31,10 +34,28 @@ fastIntDist a' b' = do
   return (x `rem` range + a)
 {-# NOINLINE fastIntDist #-}
 
-instance NFData a => Benchmarkable (Eff (State Random :> ()) a) where
+instance (NFData a, Num a) => Benchmarkable (Eff (State Random :> ()) a) where
   run eff n = do
     let res = Control.Eff.run $ runRandomState (mkRandom 0) $ do
-                last <$> replicateM n eff
+                sum <$> replicateM n eff
+
+    _ <- evaluate (rnf res)
+    return ()
+
+b2i :: Bool -> Int
+b2i True  = 1
+b2i False = 0
+
+i2b :: Int -> Bool
+i2b = (/= 0)
+
+bxor :: Bool -> Bool -> Bool
+bxor x y = i2b (b2i x `xor` b2i y)
+
+instance Benchmarkable (Eff (State Random :> ()) [Bool]) where
+  run eff n = do
+    let res = Control.Eff.run $ runRandomState (mkRandom 0) $ do
+                foldl' bxor False . map (foldl' bxor False) <$> replicateM n eff
 
     _ <- evaluate (rnf res)
     return ()
