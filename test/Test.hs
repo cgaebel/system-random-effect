@@ -2,6 +2,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Main ( main ) where
 
+import Prelude hiding (all)
+
 import Control.Eff
 import Control.Eff.Lift
 import Control.Eff.State.Strict
@@ -11,8 +13,10 @@ import System.Random.Effect
 import Control.Applicative
 import Control.Monad (void)
 import Control.Monad.ST
+import Data.Foldable (all)
 import Data.Vector ( Vector )
 import qualified Data.Vector as V
+import qualified Data.Vector.Mutable as MV
 import Data.Word
 import Data.Typeable
 
@@ -128,6 +132,35 @@ testSecureRandom a b = do
     return $ run $ runRandomState rng $
       checkRange (low, high) <$> uniformIntDist a b
 
+-- test std deviation of uniformIntDist.
+testUniformIntDist :: Word16 -> Integer -> Positive Integer -> IO Bool
+testUniformIntDist num l range = do
+      let
+        k = fromIntegral $ getPositive range
+        n = fromIntegral num
+        -- This is a binomial distribution for each number in the range, since
+        -- the odds of generation are 1 / k, and we generate num
+        -- independent numbers and sum them.
+        mean = n / k
+        stdev = sqrt (n * (k - 1)) / k
+      nums <- randomNums >>= count
+      return $ all (within mean stdev) nums
+  where
+    randomNums = let h = l + getPositive range - 1
+                 in V.replicateM (fromIntegral num)
+                  $ runLift
+                  $ mkRandomIO `forRandEff` uniformIntDist l h
+
+    count :: (Integral a, Num count) => V.Vector a -> IO (V.Vector count)
+    count v = do
+        mv <- MV.replicate (fromIntegral range) 0
+        V.forM_ v $ \a -> change mv (+ 1) (fromIntegral a - fromIntegral l)
+        V.unsafeFreeze mv
+
+    change v f i = MV.read v i >>= MV.write v i . f
+
+    within mean stdev v = abs (mean - realToFrac v) <= 5 * stdev + 1
+
 tests =
   [ testProperty "random range" testUniformRandom
   , testProperty "discrete dist range" testDiscreteDistributionInRange
@@ -138,4 +171,5 @@ tests =
   , testProperty "knuth shuffle (monadic)" (\xs seed -> morallyDubiousIOProperty $ testKnuthShuffleM xs seed)
   , testProperty "knuth shuffle equivalence" (\xs seed -> morallyDubiousIOProperty $ testKnuthShuffleEquivalence xs seed)
   , testProperty "secure random" (\a b -> morallyDubiousIOProperty $ testSecureRandom a b)
+  , testProperty "uniformIntDist stdev" $ \n l h -> morallyDubiousIOProperty $ testUniformIntDist n l h
   ]
