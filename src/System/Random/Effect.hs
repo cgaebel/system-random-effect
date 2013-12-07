@@ -57,6 +57,7 @@ module System.Random.Effect ( Random
                             , randomInt64
                             , randomWord
                             , randomWord64
+                            , randomDouble
                             , randomBits
                             , randomBitList
                             ) where
