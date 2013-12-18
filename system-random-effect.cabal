@@ -21,7 +21,7 @@ library
                      , mersenne-random-pure64 == 0.2.*
                      , statistics == 0.10.*
                      , vector == 0.10.*
-                     , vector-algorithms == 0.5.*
+                     , vector-algorithms == 0.6.*
                      , primitive == 0.5.*
                      , crypto-api == 0.12.*
                      , bytestring == 0.10.*
