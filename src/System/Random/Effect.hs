@@ -8,6 +8,10 @@
 -- | A random number effect, using a pure mersenne twister under
 --   the hood. This algorithm is not suitable for cryptography!
 --
+--   If you need cryptographically secure random numbers,
+--   you MUST use 'mkSecureRandomIO'. Otherwise, 'mkRandom' and
+--   'mkRandomIO' are much faster.
+--
 --   This effect should be plug-and-play with any application
 --   making use of extensible effects.
 --
