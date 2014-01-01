@@ -6,7 +6,9 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 -- | A random number effect, using a pure mersenne twister under
---   the hood. This should be plug-and-play with any application
+--   the hood. This algorithm is not suitable for cryptography!
+--
+--   This effect should be plug-and-play with any application
 --   making use of extensible effects.
 --
 --   Patches, even for the smallest of documentation bugs, are
