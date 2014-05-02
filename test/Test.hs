@@ -5,7 +5,7 @@ module Main ( main ) where
 
 import Prelude hiding (all)
 
-import Control.Eff
+import Control.Eff as Eff
 import Control.Eff.Lift
 import Control.Eff.State.Strict
 
@@ -22,13 +22,14 @@ import Test.Framework ( defaultMain, Test )
 import Test.Framework.Providers.QuickCheck2
 
 import Test.QuickCheck
+import Test.QuickCheck.Monadic as Test
 import Test.QuickCheck.Property ( morallyDubiousIOProperty )
 
 main :: IO ()
 main = defaultMain tests
 
 runWithSeed :: Word64 -> Eff (State Random :> ()) a -> a
-runWithSeed seed = run . runRandomState (mkRandom seed)
+runWithSeed seed = Eff.run . runRandomState (mkRandom seed)
 
 runIOWithSeed :: Word64 -> Eff (State Random :> Lift IO :> ()) a -> IO a
 runIOWithSeed seed = runLift . runRandomState (mkRandom seed)
@@ -125,7 +126,7 @@ testSecureRandom a b = do
 
   runLift $ do
     rng <- mkSecureRandomIO
-    return $ run $ runRandomState rng $
+    return $ Eff.run $ runRandomState rng $
       checkRange (low, high) <$> uniformIntDist a b
 
 (|>) :: b -> (b -> c) -> c
@@ -155,6 +156,13 @@ simpleUniformIntDistTest seed =
    in V.all (\x -> x >= samplesPerBucket - maxDelta
                 && x <= samplesPerBucket + maxDelta) hist
 
+runIOProperty ::
+    Testable prop =>
+    IO prop ->
+    Property
+runIOProperty prop
+    = monadicIO $ Test.run prop >>= stop
+
 tests :: [Test]
 tests =
   [ testProperty "random range" testUniformRandom
@@ -163,8 +171,8 @@ tests =
   , testProperty "unsafeThaw is okay to use" testUnsafeThaw
   , testProperty "testUniformIntegralDist == testUniformIntDist" testUniformIntegralDist
   , testProperty "knuth shuffle" testKnuthShuffle
-  , testProperty "knuth shuffle (monadic)" (\xs seed -> morallyDubiousIOProperty $ testKnuthShuffleM xs seed)
-  , testProperty "knuth shuffle equivalence" (\xs seed -> morallyDubiousIOProperty $ testKnuthShuffleEquivalence xs seed)
-  , testProperty "secure random" (\a b -> morallyDubiousIOProperty $ testSecureRandom a b)
+  , testProperty "knuth shuffle (monadic)" (\xs seed -> runIOProperty $ testKnuthShuffleM xs seed)
+  , testProperty "knuth shuffle equivalence" (\xs seed -> runIOProperty $ testKnuthShuffleEquivalence xs seed)
+  , testProperty "secure random" (\a b -> runIOProperty $ testSecureRandom a b)
   , testProperty "uniformIntDist is uniform-ish" simpleUniformIntDistTest
   ]
