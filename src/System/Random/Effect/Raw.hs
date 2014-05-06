@@ -11,6 +11,7 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 module System.Random.Effect.Raw ( Random
                                 -- * Seeding
                                 , mkRandom
@@ -40,6 +41,15 @@ import qualified System.Random.Mersenne.Pure64 as SR
 import Control.Eff
 import Control.Eff.Lift
 import Control.Eff.State.Strict
+
+#if MIN_VERSION_base(4,7,0)
+#else
+#define FiniteBits Bits
+
+finiteBitSize :: Bits a => a -> Int
+finiteBitSize = bitSize
+{-# INLINE finiteBitSize #-}
+#endif
 
 -- | A random number generator. Either a fast, insecure mersenne
 --   twister or a secure one, depending on which smart constructor
@@ -118,13 +128,13 @@ foldBits bs =
 {-# INLINE foldBits #-}
 
 -- | Securely generate some random bits.
-srandomBits :: ( Bits a
+srandomBits :: ( FiniteBits a
                , Num  a )
             => CR.SystemRandom
             -> (a, CR.SystemRandom)
 srandomBits sr =
   let z      = clearBit (bit 0) 0
-      nBytes = bitSize z `div` 8
+      nBytes = finiteBitSize z `div` 8
    in case CR.genBytes nBytes sr of
         Left err -> error $ "system-random-effect: System.Random.Effect.Secure: genBytes: " ++ show err
         Right (bs, sr') -> (z .|. foldBits bs, sr')

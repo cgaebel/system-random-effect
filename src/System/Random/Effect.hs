@@ -5,6 +5,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE CPP #-}
 -- | A random number effect, using a pure mersenne twister under
 --   the hood. This algorithm is not suitable for cryptography!
 --
@@ -99,6 +100,16 @@ import Control.Eff.State.Strict
 
 import System.Random.Effect.Raw
 
+#if MIN_VERSION_base(4,7,0)
+#else
+#define Typeable Typeable1
+#define FiniteBits Bits
+
+finiteBitSize :: Bits a => a -> Int
+finiteBitSize = bitSize
+{-# INLINE finiteBitSize #-}
+#endif
+
 randomDouble :: Member (State Random) r
              => Eff r Double
 randomDouble = do
@@ -109,11 +120,11 @@ randomDouble = do
 -- | Yields a set of random from the internal generator,
 --   using 'randomWord64' internally.
 randomBits :: ( Member (State Random) r
-              , Bits x)
+              , FiniteBits x)
            => Eff r x
 randomBits = do
   let z     = clearBit (bit 0) 0 -- zero, so we can get the number of bits
-      nBits = bitSize z
+      nBits = finiteBitSize z
 
   -- we OR with zero to get the number of bits above.
   -- it shouldn't affect the output.
@@ -127,7 +138,7 @@ randomBitList :: Member (State Random) r
 randomBitList k = do
   let iters = (k `div` 64) + 1
 
-      breakBits w = map (testBit w) [0..(bitSize w - 1)]
+      breakBits w = map (testBit w) [0..(finiteBitSize w - 1)]
 
   word64s <- replicateM iters randomWord64
 
@@ -572,7 +583,7 @@ piecewiseLinearDist = piecewiseDist linearRealDist
 -- | Shuffle a mutable vector.
 knuthShuffleM :: ( PrimMonad m
                  , Applicative m
-                 , Typeable1 m
+                 , Typeable m
                  , Member (State Random) r
                  , SetMember Lift (Lift m) r
                  )
